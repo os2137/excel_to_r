@@ -1,0 +1,245 @@
+---
+title: "filter"
+author: "Onkar Singh"
+date: "10/3/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+library(tidyverse)
+```
+
+## source data
+### [video & data] (https://www.youtube.com/watch?v=JuTdj2j-9Kg)
+
+
+Two ways to reading/coverting the date columns from excel to R
+
+The base function as.Date handles this type of conversion nicely. The trick is that you have to provide the origin, which in Excel is December 30, 1899. 
+
+Read further for other options: 
+https://stackoverflow.com/questions/43230470/how-to-convert-excel-date-format-to-proper-date-in-r/43230524#43230524
+
+
+
+```{r}
+data <- readxl::read_xlsx("filter-examples.xlsx", sheet = "data") %>% 
+   mutate(Date_Joined = as.Date(Date_Joined, origin = "1899-12-30")) 
+  # janitor::clean_names() %>% 
+  # mutate(date_joined = lubridate::as_date(date_joined)) #This is the best way but commenting it out because we want the Column Name in Camel Case so I have changed the Date Joined column name in excel to Date_Joined by filling the space with a underscore for R to read it naturally n not throw any error
+  
+
+
+data
+```
+
+### Filter rows where gender == female
+
+```{r}
+data %>% 
+    filter(Gender == "Female")
+```
+
+
+### Filter rows where Gender is female and only print the name column
+
+
+```{r}
+data %>% 
+  filter(Gender == "Female") %>% 
+  select(Name)
+```
+
+### Filter dynamically by assigning the filter criteria to a variable
+
+```{r}
+gender_filter <- "Female"
+
+data %>% 
+  filter(Gender == gender_filter) %>% 
+  select(Name)
+```
+
+
+## Count the number of values after filtering
+
+```{r}
+data %>% 
+  filter(Gender == gender_filter) %>% 
+  select(Name) %>% 
+  count()
+```
+
+
+### We want to filter all the male employees in the website department
+
+```{r}
+data %>% 
+  filter(Gender == "Male", 
+         Department == "Website")
+```
+
+### filter staff from a particular department with salary above 90K: AND Condition Example
+
+```{r}
+data %>% 
+    filter(Department == "Website", 
+         Salary > 90000)
+```
+
+### filter staff from a particular department or with salary above 90K: OR Condition Example
+outputs everybody in the Website or have a salary over 90K
+```{r}
+data %>% 
+    filter(Department == "Website" |
+         Salary > 90000)
+```
+
+outputs everybody in the Sales or have a salary over 80K
+
+```{r}
+data %>% 
+    filter(Department == "Sales" |
+         Salary > 80000)
+```
+
+
+### Anybody who joined after this particular date or who have a salary less than 65K
+
+```{r}
+data %>% 
+    filter(Date_Joined > "2019-01-01" |
+         Salary < 65000)
+```
+
+### Not Condition: Print Any Cells where the geography is not USA from 2nd data table
+
+```{r}
+data2 <- readxl::read_excel("filter-examples.xlsx", sheet = "data2")
+
+data2 %>% 
+  filter(Geography != "USA")
+```
+
+### Not Condition: Print Any Cells where the geography is not USA and only print the sales column
+
+```{r}
+data2 %>% 
+  filter(Geography != "USA") %>% 
+  select(Amount) %>% 
+  count(name = "total_row_count", sum = sum(Amount)) %>% 
+  select(total_row_count, sum)
+```
+
+
+
+### Complex Condition 
+Geography is either USA or UK and the amount is grater than 2000 dollars
+
+
+```{r}
+data2 %>% 
+  filter(Geography %in% c("USA", "UK"), 
+         Amount> 2000) %>% 
+  count(name = "total_row_count", Total_Amount = sum(Amount), Total_Units = sum(Units)) %>% 
+  select(total_row_count, everything())
+  
+```
+
+
+### What if there is an error in the formula or say the value for which we are flitering doesnt existing in R it will simply return 0 rows but excel throws error
+
+```{r}
+data2 %>% 
+  filter(Geography %in% c("USA", "UK"), 
+         Amount> 50000) %>% # we know that there is no amount greater than 50000 in the table
+  count(name = "total_row_count", Total_Amount = sum(Amount), Total_Units = sum(Units)) %>% 
+  select(total_row_count, everything())
+  
+```
+
+ ## Filter Problems
+ 
+### 1. Print names of all people in either Sales or Website department
+
+```{r}
+data %>% 
+  filter(Department %in% c("Sales", "Website")) %>% 
+  select(Name)
+```
+
+### 2. How many people have joined in the first 3 months of 2018 & 2019?
+
+```{r}
+data %>% 
+  filter (Date_Joined >= "2018-01-31", 
+          Date_Joined <= "2018-03-31" |
+            Date_Joined >= "2019-01-31", 
+          Date_Joined <= "2019-03-31")
+
+
+```
+
+### 3. Print data for all 50% dark bites sold in New Zealand
+
+```{r}
+data2 %>% 
+  filter(Geography == "New Zealand", 
+         Product == "50% Dark Bites") 
+  
+```
+
+### 4. What is the total amount where country is neither India nor Australia
+
+```{r}
+data2 %>% 
+  filter(!Geography %in% c("India", "Australia")) %>% 
+  count(name = "total_rows_count", sum = sum(Amount)) %>% 
+  select(total_rows_count, sum)
+```
+
+
+
+
+### 5. Print data for all sales from other people where the amount is > average sales of Gunar Cockshoot
+
+```{r}
+data2 %>% 
+  filter(`Sales Person` == "Gunar Cockshoot") %>% 
+  count(avg_GC = mean(Amount), name = "total_row_count") %>% 
+  select(total_row_count, avg_GC)
+```
+
+```{r}
+data2 %>% 
+  filter(`Sales Person` != "Gunar Cockshoot", 
+Amount > 3395)
+```
+
+
+## Advanced Filter Trick Example by Leila Gharani
+
+[link of the video n file](https://www.youtube.com/watch?v=evrnIuDRtsQ)
+
+
+```{r}
+data3 <- readxl::read_excel("Advanced_Filter_Trick_Example.xlsx", sheet = "Data") %>% 
+  mutate(Date = lubridate:: as_date(Date))
+
+data3
+```
+
+
+### Filter with a date greater than a value plus string match
+
+```{r}
+data3 %>% 
+  filter(Date > "2019-07-01", 
+         str_detect(`Article Description`, "Lap"))
+```
+
