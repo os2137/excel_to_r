@@ -1,0 +1,152 @@
+---
+title: "onpenxlsx_creating_spreadsheet_from_r"
+output: html_document
+date: "2022-11-27"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+[Tweet from Neil Currie](https://twitter.com/neilgcurrie/status/1596186976717193216)
+```{r cars}
+library(openxlsx)
+library(dplyr)
+library(ggplot2)
+library(glue)
+```
+
+```{r}
+#install.packages(c('openxlsx', 'dplyr', 'ggplot2', 'glue'))
+# install.packages('here')
+```
+
+```{r}
+# Make some dummy data
+
+diamonds_xl <- diamonds |> 
+  group_by(cut) |> 
+  summarize (n = n(), 
+             average_price = mean(price), 
+             total_price = sum(price))
+
+# Create workbook
+wb <-  createWorkbook()
+
+addWorksheet(wb, "diamonds")
+addWorksheet(wb, "starwars")
+
+filename <- glue("{here::here()}/data/workbook.xlsx")
+
+saveWorkbook(wb, filename)
+  
+```
+
+## 2. Adding data
+
+Adding data is straightforward too.
+
+You can specify details like what sheet to use, which column and row to start writing, and if you should include column and row names or numbers.
+
+Data is written in blocks starting in the row and column you specify.
+```{r}
+writeData(wb, sheet = 'diamonds', x = diamonds_xl, startCol = 2, startRow = 1)
+
+writeData(wb, sheet = 'starwars', x = starwars, rowNames = TRUE)
+```
+
+## 3. Adding formulas
+
+Spreadsheets are driven by formulas. You can do all sorts of calculations in R but if you want your spreadsheet to react to user input you need a formula.
+
+Formulas can be written as strings and added using the writeFormula function.
+
+We will add in a Target Price and Price Difference columns. The Price Difference column will be formula based.
+
+The user will be able to write whatever they want in the Target Price cells and the formula will update.
+
+```{r}
+## Add headings
+writeData(wb, sheet = 'diamonds', x = 'Target Price', startCol = 7)
+writeData(wb, sheet = 'diamonds', x = 'Price Difference', startCol = 8)
+
+# The user will write a target price manually later
+# add a formula to calculate the difference 
+# you don't need the equal sign
+
+price_diff <- glue("G{2:6}-E{2:6}")
+
+writeFormula(wb, sheet = 'diamonds', x = price_diff, startCol = 8, startRow = 2)
+```
+
+
+## 4. Formatting cells
+
+Now we have a functional spreadsheet. But it looks pretty basic.
+
+To make it look better and be more usable we need to style it.
+
+First we need to create the styles. We then add that style to whatever cells we want.
+
+```{r}
+# Some different styles
+style_header = createStyle(fontSize = 16, fontColour = 'blue', border = 'bottom', wrapText = TRUE)
+
+style_currency = createStyle(numFmt = "CURRENCY")
+
+style_user_input = createStyle(fgFill = 'yellow')
+
+# Write
+addStyle(wb, sheet = 'diamonds', style_header, rows = 1, cols = 2:8, gridExpand = TRUE)
+addStyle(wb, sheet = 'diamonds', style_currency, rows = 2:6, cols = 4:5, gridExpand = TRUE)
+addStyle(wb, sheet = 'diamonds', style_user_input, rows = 2:6, cols = 7, gridExpand = TRUE)
+```
+
+## 5. Formatting the spreadsheet
+
+We can't really see the data in the header. And it is a bit messy. The code attached will tidy that up.
+
+Freezing panes can also be useful when data is bigger than the screen.
+
+```{r}
+setColWidths(wb, sheet = 'diamonds', cols = c(1, 6), widths = 3)
+setColWidths(wb, sheet = 'diamonds', cols = c(2:5, 7:8), widths = 15)
+setRowHeights(wb, sheet = 'diamonds', rows = 1, heights = 50)
+
+freezePane(wb, sheet = "diamonds", firstActiveCol = 3)
+
+colnames(diamonds_xl) <- c("Cut", "Num Diamonds", "Average Price", "Total Price")
+
+writeData(wb, sheet = "diamonds", x = diamonds_xl, startCol = 2, startRow = 1)
+```
+
+## 6. Conditional formatting
+
+Conditional formatting is useful in all sorts of situations. A common one is highlighting if values are positive or negative so they stand out to the user.
+
+And doing this is similar to adding a regular style.
+
+```{r}
+neg_style <- createStyle(fontColour = "#9C0006", bgFill = "#FFC7CE")
+pos_style <- createStyle(fontColour = "#006100", bgFill = "#C6EFCE")
+
+conditionalFormatting(wb, sheet = "diamonds", cols = 8, rows = 2:6, rule = "<0", style = neg_style)
+conditionalFormatting(wb, sheet = "diamonds", cols = 8, rows = 2:6, rule = ">0", style = pos_style)
+
+saveWorkbook(wb, filename, overwrite = TRUE)
+```
+
+To recap:
+
+You can create spreadsheets from scratch directly from R with openxlsx.
+
+You can add data, formulas, format cells and freeze panes plus more.
+
+This is ideal for automating processes, saving time and improving quality.
+
+Great thread! Just to add one more {openxlsx} function that I find quite helpful: 
+
+`writeDataTable()` writes and formats the data as a filterable Excel table. It lets you even specify which table template to use.
+
+There's also the rhandsontable package which is really handy for building spreadsheets into shiny apps
+
